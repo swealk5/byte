@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PlayDeck — Unblocked Browser Games</title>
+    <meta
+      name="description"
+      content="An unblocked browser games portal where every game is stored as an iframe entry in a JSON catalog."
+    />
+    <meta property="og:title" content="PlayDeck — Unblocked Browser Games" />
+    <meta
+      property="og:description"
+      content="An unblocked browser games portal where every game is stored as an iframe entry in a JSON catalog."
+    />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a href="#top" id="brandLink" class="brand-wordmark">PlayDeck</a>
+
+        <nav class="header-nav" aria-label="Game categories">
+          <a href="#library" class="nav-link is-active" data-nav-category="All">All Games</a>
+          <a href="#library" class="nav-link" data-nav-category="Arcade">Arcade</a>
+          <a href="#library" class="nav-link" data-nav-category="Puzzle">Puzzle</a>
+          <a href="#library" class="nav-link" data-nav-category="Action">Action</a>
+        </nav>
+
+        <div class="header-actions">
+          <button type="button" id="openAddModalBtn" class="btn-primary">Add Game</button>
+        </div>
+      </div>
+    </header>
+
+    <main id="top" class="page-main">
+      <!-- Library View -->
+      <section id="libraryView" class="library-view" aria-label="Game library">
+        <!-- Featured Game Hero Split -->
+        <section id="featuredHero" class="featured-hero" aria-label="Featured game">
+          <div class="featured-content">
+            <p class="featured-kicker" id="featuredKicker">Featured Arcade</p>
+            <h1 class="featured-title" id="featuredTitle">Brick Breaker</h1>
+            <p class="featured-desc" id="featuredDesc">
+              Smash layered ceramic and slate blocks with angled paddle rebounds, combo multipliers, and progressive arcade stages.
+            </p>
+            <div class="featured-meta" id="featuredMeta">
+              <span>Arcade</span>
+              <span aria-hidden="true">·</span>
+              <span>Mouse or Arrow Keys</span>
+            </div>
+            <div class="featured-cta-row">
+              <button type="button" id="featuredPlayBtn" class="btn-primary btn-lg">Play Now</button>
+              <button type="button" id="randomGameBtn" class="btn-secondary btn-lg">Random Game</button>
+            </div>
+          </div>
+          <div class="featured-media">
+            <img
+              id="featuredImage"
+              src="/images/thumb_brick_breaker_1794522482950.jpg"
+              alt="Brick Breaker cover artwork"
+              referrerpolicy="no-referrer"
+            />
+          </div>
+        </section>
+
+        <!-- Search & Filter Toolbar -->
+        <section id="library" class="catalog-section" aria-label="Browse all games">
+          <div class="catalog-toolbar">
+            <div class="toolbar-left">
+              <h2 class="section-heading">Game Catalog</h2>
+              <span class="catalog-count" id="catalogCount">6 games</span>
+            </div>
+
+            <div class="toolbar-controls">
+              <div class="segmented-tabs" role="tablist" aria-label="Filter games by category">
+                <button type="button" class="tab-btn is-active" role="tab" aria-selected="true" data-filter="All">All</button>
+                <button type="button" class="tab-btn" role="tab" aria-selected="false" data-filter="Arcade">Arcade</button>
+                <button type="button" class="tab-btn" role="tab" aria-selected="false" data-filter="Puzzle">Puzzle</button>
+                <button type="button" class="tab-btn" role="tab" aria-selected="false" data-filter="Action">Action</button>
+                <button type="button" class="tab-btn" role="tab" aria-selected="false" data-filter="Favorites">Favorites</button>
+              </div>
+
+              <div class="search-field">
+                <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <path d="m21 21-4.3-4.3"></path>
+                </svg>
+                <input
+                  type="search"
+                  id="searchInput"
+                  class="search-input"
+                  placeholder="Search games..."
+                  aria-label="Search games"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Loading / Error / Empty States -->
+          <div id="catalogStatus" class="catalog-status" hidden></div>
+
+          <!-- Game Cards Grid -->
+          <div id="gameGrid" class="game-grid" role="list"></div>
+        </section>
+      </section>
+
+      <!-- Player Stage View -->
+      <section id="playerView" class="player-view" hidden aria-label="Game player">
+        <div class="player-topbar">
+          <div class="player-title-group">
+            <button type="button" id="backToLibraryBtn" class="btn-secondary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m15 18-6-6 6-6"></path>
+              </svg>
+              <span>Back to Library</span>
+            </button>
+            <div class="player-heading-wrap">
+              <h1 id="playerTitle" class="player-title">Game Title</h1>
+              <div id="playerMeta" class="player-meta"></div>
+            </div>
+          </div>
+
+          <div class="player-controls">
+            <button type="button" id="favoriteBtn" class="btn-secondary" aria-pressed="false">Favorite</button>
+            <button type="button" id="reloadGameBtn" class="btn-secondary">Reload</button>
+            <button type="button" id="theatreBtn" class="btn-secondary" aria-pressed="false">Theatre Mode</button>
+            <button type="button" id="fullscreenBtn" class="btn-primary">Fullscreen</button>
+          </div>
+        </div>
+
+        <div id="stageShell" class="stage-shell">
+          <div id="iframeLoader" class="iframe-loader">
+            <span>Loading game frame...</span>
+          </div>
+          <div id="iframeHost" class="iframe-host"></div>
+        </div>
+
+        <div class="player-footer-bar">
+          <p id="playerDescription" class="player-description"></p>
+          <div class="player-json-actions">
+            <button type="button" id="toggleJsonBtn" class="btn-ghost">View Iframe JSON</button>
+            <button type="button" id="removeCustomBtn" class="btn-ghost-danger" hidden>Remove Game</button>
+          </div>
+        </div>
+
+        <pre id="jsonPreview" class="json-preview" hidden></pre>
+
+        <section class="more-games-section" aria-label="More games">
+          <h2 class="section-heading">More Games</h2>
+          <div id="relatedGrid" class="game-grid"></div>
+        </section>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <p class="footer-copy">PlayDeck · Games loaded from <code class="inline-code">games.json</code></p>
+        <div class="footer-links">
+          <a href="/games.json" target="_blank" rel="noopener" class="footer-link">Raw games.json</a>
+          <button type="button" id="exportJsonBtn" class="footer-link-btn">Download JSON</button>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Add Custom Game Modal -->
+    <div id="addGameModal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 id="modalTitle" class="modal-title">Add Game Iframe</h2>
+          <button type="button" id="closeModalBtn" class="modal-close" aria-label="Close modal">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M18 6 6 18"></path>
+              <path d="m6 6 12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <form id="addGameForm" class="modal-form">
+          <div class="form-field">
+            <label for="gameTitleInput" class="form-label">Game Title</label>
+            <input type="text" id="gameTitleInput" class="form-input" placeholder="e.g. Retro Tetris" required maxlength="48" />
+          </div>
+
+          <div class="form-row">
+            <div class="form-field">
+              <label for="gameCategoryInput" class="form-label">Category</label>
+              <select id="gameCategoryInput" class="form-input">
+                <option value="Arcade">Arcade</option>
+                <option value="Puzzle">Puzzle</option>
+                <option value="Action">Action</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="gameControlsInput" class="form-label">Controls</label>
+              <input type="text" id="gameControlsInput" class="form-input" placeholder="Arrow Keys" value="Keyboard & Mouse" maxlength="40" />
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label for="gameIframeInput" class="form-label">Iframe HTML or Game URL</label>
+            <textarea
+              id="gameIframeInput"
+              class="form-textarea"
+              rows="3"
+              placeholder='<iframe src="https://example.com/game" title="My Game" allowfullscreen></iframe>'
+              required
+            ></textarea>
+            <p class="form-hint">Paste a full &lt;iframe&gt; tag or a direct https:// or /games/ URL.</p>
+          </div>
+
+          <div class="form-field">
+            <label for="gameDescInput" class="form-label">Short Description</label>
+            <input type="text" id="gameDescInput" class="form-input" placeholder="Fast-paced browser classic." maxlength="140" />
+          </div>
+
+          <p id="formError" class="form-error" hidden></p>
+
+          <div class="modal-actions">
+            <button type="button" id="cancelModalBtn" class="btn-secondary">Cancel</button>
+            <button type="submit" class="btn-primary">Save to Catalog</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script type="module" src="/src/app.js"></script>
+  </body>
+</html>

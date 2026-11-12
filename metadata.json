@@ -1,0 +1,6 @@
+{
+  "name": "PlayDeck",
+  "description": "An unblocked browser games portal where every game is stored as an iframe entry in a JSON catalog.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

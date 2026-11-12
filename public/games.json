@@ -1,0 +1,64 @@
+{
+  "games": [
+    {
+      "id": "brick-breaker",
+      "title": "Brick Breaker",
+      "category": "Arcade",
+      "controls": "Mouse or Arrow Keys",
+      "description": "Smash layered slate and terracotta bricks with angled paddle rebounds, combo scoring, and multi-stage levels.",
+      "thumbnail": "/images/thumb_brick_breaker_1794522482950.jpg",
+      "featured": true,
+      "iframe": "<iframe src=\"/games/brick-breaker.html\" title=\"Brick Breaker\" loading=\"lazy\" allow=\"fullscreen\" allowfullscreen></iframe>"
+    },
+    {
+      "id": "snake-classic",
+      "title": "Snake Classic",
+      "category": "Arcade",
+      "controls": "Arrow Keys or WASD",
+      "description": "Steer across the grid, collect golden fruit to grow longer, and beat your personal length record without hitting the walls.",
+      "thumbnail": "/images/thumb_snake_1794522483135.jpg",
+      "featured": false,
+      "iframe": "<iframe src=\"/games/snake.html\" title=\"Snake Classic\" loading=\"lazy\" allow=\"fullscreen\" allowfullscreen></iframe>"
+    },
+    {
+      "id": "tile-2048",
+      "title": "2048 Slide",
+      "category": "Puzzle",
+      "controls": "Arrow Keys or Swipe",
+      "description": "Slide matching numbered ceramic tiles together on a 4x4 grid to merge powers of two all the way to 2048.",
+      "thumbnail": "/images/thumb_2048_1794522483516.jpg",
+      "featured": false,
+      "iframe": "<iframe src=\"/games/2048.html\" title=\"2048 Slide\" loading=\"lazy\" allow=\"fullscreen\" allowfullscreen></iframe>"
+    },
+    {
+      "id": "space-defender",
+      "title": "Space Defender",
+      "category": "Action",
+      "controls": "A/D or Arrows + Space",
+      "description": "Pilot an interceptor through descending alien formations, dodge plasma volleys, and clear wave after wave.",
+      "thumbnail": "/images/thumb_space_defender_1794522483997.jpg",
+      "featured": false,
+      "iframe": "<iframe src=\"/games/space-defender.html\" title=\"Space Defender\" loading=\"lazy\" allow=\"fullscreen\" allowfullscreen></iframe>"
+    },
+    {
+      "id": "flappy-hop",
+      "title": "Twilight Wing",
+      "category": "Action",
+      "controls": "Space, Up, or Click",
+      "description": "Tap to glide cleanly between tall emerald stone pillars at dusk in a tight rhythm-physics endurance run.",
+      "thumbnail": "/images/thumb_flappy_hop_1794522484295.jpg",
+      "featured": false,
+      "iframe": "<iframe src=\"/games/flappy-hop.html\" title=\"Twilight Wing\" loading=\"lazy\" allow=\"fullscreen\" allowfullscreen></iframe>"
+    },
+    {
+      "id": "minesweeper-grid",
+      "title": "Minesweeper",
+      "category": "Puzzle",
+      "controls": "Left Reveal · Right Flag",
+      "description": "Uncover safe slate tiles using numeric adjacency clues while flagging hidden mines across Easy and Medium boards.",
+      "thumbnail": "/images/thumb_minesweeper_1794522484599.jpg",
+      "featured": false,
+      "iframe": "<iframe src=\"/games/minesweeper.html\" title=\"Minesweeper\" loading=\"lazy\" allow=\"fullscreen\" allowfullscreen></iframe>"
+    }
+  ]
+}

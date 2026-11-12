@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Space Defender</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0b1120;
+      color: #f8fafc;
+      font-family: system-ui, -apple-system, sans-serif;
+      user-select: none;
+    }
+    .wrap {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 12px 16px 16px;
+      gap: 10px;
+    }
+    .hud {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px;
+      background: #162033;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .hud-stats { display: flex; gap: 20px; }
+    .hud-label { color: #94a3b8; font-weight: 500; margin-right: 4px; }
+    .btn {
+      padding: 6px 12px;
+      border-radius: 7px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: #1e293b;
+      color: #f8fafc;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-accent {
+      background: #f59e0b;
+      color: #0f172a;
+      border-color: transparent;
+      padding: 10px 22px;
+      font-size: 15px;
+    }
+    .stage {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #070b14;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    canvas { width: 100%; height: 100%; display: block; }
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 24px;
+      background: rgba(7, 11, 20, 0.86);
+      text-align: center;
+    }
+    .overlay[hidden] { display: none; }
+    .overlay h1 { margin: 0; font-size: 28px; }
+    .overlay p { margin: 0; color: #94a3b8; max-width: 360px; font-size: 14px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hud">
+      <div class="hud-stats">
+        <div><span class="hud-label">Score</span><span id="scoreVal">0</span></div>
+        <div><span class="hud-label">Best</span><span id="bestVal">0</span></div>
+        <div><span class="hud-label">Wave</span><span id="waveVal">1</span></div>
+        <div><span class="hud-label">Hull</span><span id="livesVal">3</span></div>
+      </div>
+      <button type="button" class="btn" id="muteBtn">Sound: On</button>
+    </div>
+
+    <div class="stage">
+      <canvas id="spaceCanvas" width="800" height="480"></canvas>
+      <div class="overlay" id="overlay">
+        <h1 id="overlayTitle">Space Defender</h1>
+        <p id="overlayDesc">Move with Left/Right or A/D, press Space to fire. Clear each wave before vessels breach your line.</p>
+        <button type="button" class="btn btn-accent" id="startBtn">Start Game</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('spaceCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreVal = document.getElementById('scoreVal');
+    const bestVal = document.getElementById('bestVal');
+    const waveVal = document.getElementById('waveVal');
+    const livesVal = document.getElementById('livesVal');
+    const overlay = document.getElementById('overlay');
+    const overlayTitle = document.getElementById('overlayTitle');
+    const overlayDesc = document.getElementById('overlayDesc');
+    const startBtn = document.getElementById('startBtn');
+    const muteBtn = document.getElementById('muteBtn');
+
+    const BEST_KEY = 'playdeck_space_best';
+    let best = Number(localStorage.getItem(BEST_KEY) || 0);
+    bestVal.textContent = String(best);
+
+    let audioCtx = null;
+    let muted = false;
+    function beep(freq, dur = 0.05, type = 'square') {
+      if (muted) return;
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + dur);
+      } catch {}
+    }
+
+    const W = 800;
+    const H = 480;
+    const stars = Array.from({ length: 65 }, () => ({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      s: Math.random() * 1.8 + 0.6,
+      v: Math.random() * 0.6 + 0.25,
+    }));
+
+    let state = 'TITLE_MENU';
+    let score = 0;
+    let wave = 1;
+    let lives = 3;
+    let ship = { x: W / 2, y: H - 42, w: 36, h: 24, speed: 6 };
+    let bullets = [];
+    let enemyBullets = [];
+    let enemies = [];
+    let enemyDir = 1;
+    let cooldown = 0;
+    let keys = { left: false, right: false, fire: false };
+
+    function spawnWave() {
+      enemies = [];
+      enemyBullets = [];
+      const rows = Math.min(4, 2 + Math.floor(wave / 2));
+      const cols = 9;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          enemies.push({
+            x: 100 + c * 66,
+            y: 52 + r * 44,
+            w: 32,
+            h: 22,
+            alive: true,
+            tier: rows - r,
+          });
+        }
+      }
+      enemyDir = 1;
+    }
+
+    function updateHud() {
+      scoreVal.textContent = String(score);
+      waveVal.textContent = String(wave);
+      livesVal.textContent = String(lives);
+      if (score > best) {
+        best = score;
+        bestVal.textContent = String(best);
+        localStorage.setItem(BEST_KEY, String(best));
+      }
+    }
+
+    function startGame() {
+      score = 0;
+      wave = 1;
+      lives = 3;
+      bullets = [];
+      ship.x = W / 2;
+      spawnWave();
+      updateHud();
+      state = 'PLAYING';
+      overlay.hidden = true;
+    }
+
+    function endGame() {
+      state = 'GAME_OVER';
+      beep(150, 0.22, 'sawtooth');
+      overlayTitle.textContent = 'Hull Breached';
+      overlayDesc.textContent = `Final score: ${score} · Reached Wave ${wave}.`;
+      startBtn.textContent = 'Play Again';
+      overlay.hidden = false;
+    }
+
+    function update() {
+      for (const st of stars) {
+        st.y += st.v;
+        if (st.y > H) { st.y = 0; st.x = Math.random() * W; }
+      }
+      if (state !== 'PLAYING') return;
+
+      if (keys.left) ship.x -= ship.speed;
+      if (keys.right) ship.x += ship.speed;
+      ship.x = Math.max(24, Math.min(W - 24, ship.x));
+
+      if (cooldown > 0) cooldown--;
+      if (keys.fire && cooldown === 0) {
+        bullets.push({ x: ship.x, y: ship.y - 16, dy: -8 });
+        cooldown = 14;
+        beep(720, 0.04, 'triangle');
+      }
+
+      bullets.forEach((b) => (b.y += b.dy));
+      bullets = bullets.filter((b) => b.y > -10);
+
+      enemyBullets.forEach((b) => (b.y += b.dy));
+      enemyBullets = enemyBullets.filter((b) => b.y < H + 10);
+
+      let edgeHit = false;
+      const aliveEnemies = enemies.filter((e) => e.alive);
+      const speedX = (1.1 + wave * 0.25) * enemyDir;
+
+      for (const e of aliveEnemies) {
+        e.x += speedX;
+        if (e.x < 28 || e.x > W - 28) edgeHit = true;
+        if (e.y + e.h / 2 >= ship.y - 12) {
+          endGame();
+          return;
+        }
+      }
+      if (edgeHit) {
+        enemyDir *= -1;
+        for (const e of aliveEnemies) e.y += 16;
+      }
+
+      if (aliveEnemies.length > 0 && Math.random() < 0.02 + wave * 0.005) {
+        const shooter = aliveEnemies[Math.floor(Math.random() * aliveEnemies.length)];
+        enemyBullets.push({ x: shooter.x, y: shooter.y + 12, dy: 4.2 + wave * 0.2 });
+      }
+
+      for (const b of bullets) {
+        for (const e of aliveEnemies) {
+          if (Math.abs(b.x - e.x) < e.w / 2 + 4 && Math.abs(b.y - e.y) < e.h / 2 + 6) {
+            e.alive = false;
+            b.y = -999;
+            score += 20 * e.tier;
+            updateHud();
+            beep(420, 0.06, 'sawtooth');
+            break;
+          }
+        }
+      }
+
+      for (const eb of enemyBullets) {
+        if (Math.abs(eb.x - ship.x) < ship.w / 2 && Math.abs(eb.y - ship.y) < ship.h / 2) {
+          eb.y = H + 999;
+          lives -= 1;
+          updateHud();
+          beep(180, 0.14, 'sawtooth');
+          if (lives <= 0) {
+            endGame();
+            return;
+          }
+        }
+      }
+
+      if (enemies.every((e) => !e.alive)) {
+        wave += 1;
+        bullets = [];
+        spawnWave();
+        updateHud();
+        beep(840, 0.12, 'sine');
+      }
+    }
+
+    function draw() {
+      ctx.fillStyle = '#070b14';
+      ctx.fillRect(0, 0, W, H);
+
+      ctx.fillStyle = 'rgba(226, 232, 240, 0.55)';
+      for (const st of stars) {
+        ctx.fillRect(st.x, st.y, st.s, st.s);
+      }
+
+      // Ship
+      ctx.fillStyle = '#e2e8f0';
+      ctx.beginPath();
+      ctx.moveTo(ship.x, ship.y - 14);
+      ctx.lineTo(ship.x + 18, ship.y + 10);
+      ctx.lineTo(ship.x - 18, ship.y + 10);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#f59e0b';
+      ctx.fillRect(ship.x - 3, ship.y - 4, 6, 10);
+
+      // Player lasers
+      ctx.fillStyle = '#f59e0b';
+      for (const b of bullets) {
+        ctx.fillRect(b.x - 2, b.y - 8, 4, 14);
+      }
+
+      // Enemy lasers
+      ctx.fillStyle = '#f87171';
+      for (const eb of enemyBullets) {
+        ctx.fillRect(eb.x - 2, eb.y - 6, 4, 12);
+      }
+
+      // Enemies
+      for (const e of enemies) {
+        if (!e.alive) continue;
+        ctx.fillStyle = e.tier >= 3 ? '#fb923c' : e.tier === 2 ? '#38bdf8' : '#34d399';
+        ctx.beginPath();
+        ctx.roundRect(e.x - e.w / 2, e.y - e.h / 2, e.w, e.h, 5);
+        ctx.fill();
+        ctx.fillStyle = '#070b14';
+        ctx.fillRect(e.x - 8, e.y - 3, 5, 5);
+        ctx.fillRect(e.x + 3, e.y - 3, 5, 5);
+      }
+    }
+
+    function loop() {
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (['ArrowLeft', 'ArrowRight', ' ', 'Spacebar'].includes(e.key)) e.preventDefault();
+      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
+      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+      if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.fire = true;
+    });
+
+    document.addEventListener('keyup', (e) => {
+      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
+      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+      if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.fire = false;
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (state !== 'PLAYING') return;
+      const rect = canvas.getBoundingClientRect();
+      ship.x = Math.max(24, Math.min(W - 24, ((e.clientX - rect.left) / rect.width) * W));
+    });
+    canvas.addEventListener('mousedown', () => { if (state === 'PLAYING') keys.fire = true; });
+    window.addEventListener('mouseup', () => { keys.fire = false; });
+
+    startBtn.addEventListener('click', startGame);
+    muteBtn.addEventListener('click', () => {
+      muted = !muted;
+      muteBtn.textContent = muted ? 'Sound: Off' : 'Sound: On';
+    });
+
+    spawnWave();
+    loop();
+  </script>
+</body>
+</html>

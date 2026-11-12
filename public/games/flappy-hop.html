@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Twilight Wing</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0b1120;
+      color: #f8fafc;
+      font-family: system-ui, -apple-system, sans-serif;
+      user-select: none;
+    }
+    .wrap {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 12px 16px 16px;
+      gap: 10px;
+    }
+    .hud {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px;
+      background: #162033;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .hud-stats { display: flex; gap: 20px; }
+    .hud-label { color: #94a3b8; font-weight: 500; margin-right: 4px; }
+    .btn {
+      padding: 6px 12px;
+      border-radius: 7px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: #1e293b;
+      color: #f8fafc;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-accent {
+      background: #f59e0b;
+      color: #0f172a;
+      border-color: transparent;
+      padding: 10px 22px;
+      font-size: 15px;
+    }
+    .stage {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    canvas { width: 100%; height: 100%; display: block; cursor: pointer; }
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 24px;
+      background: rgba(11, 17, 32, 0.8);
+      text-align: center;
+    }
+    .overlay[hidden] { display: none; }
+    .overlay h1 { margin: 0; font-size: 28px; }
+    .overlay p { margin: 0; color: #94a3b8; max-width: 340px; font-size: 14px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hud">
+      <div class="hud-stats">
+        <div><span class="hud-label">Score</span><span id="scoreVal">0</span></div>
+        <div><span class="hud-label">Best</span><span id="bestVal">0</span></div>
+      </div>
+      <button type="button" class="btn" id="muteBtn">Sound: On</button>
+    </div>
+
+    <div class="stage">
+      <canvas id="skyCanvas" width="800" height="460"></canvas>
+      <div class="overlay" id="overlay">
+        <h1 id="overlayTitle">Twilight Wing</h1>
+        <p id="overlayDesc">Press Space, Up Arrow, or click anywhere to flap between the stone pillars.</p>
+        <button type="button" class="btn btn-accent" id="startBtn">Start Game</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('skyCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreVal = document.getElementById('scoreVal');
+    const bestVal = document.getElementById('bestVal');
+    const overlay = document.getElementById('overlay');
+    const overlayTitle = document.getElementById('overlayTitle');
+    const overlayDesc = document.getElementById('overlayDesc');
+    const startBtn = document.getElementById('startBtn');
+    const muteBtn = document.getElementById('muteBtn');
+
+    const BEST_KEY = 'playdeck_wing_best';
+    let best = Number(localStorage.getItem(BEST_KEY) || 0);
+    bestVal.textContent = String(best);
+
+    let audioCtx = null;
+    let muted = false;
+    function beep(freq, dur = 0.05) {
+      if (muted) return;
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + dur);
+      } catch {}
+    }
+
+    const W = 800;
+    const H = 460;
+    let state = 'TITLE_MENU';
+    let bird = { x: 180, y: H / 2, vy: 0, r: 14 };
+    let pillars = [];
+    let score = 0;
+    let frameCount = 0;
+
+    function updateHud() {
+      scoreVal.textContent = String(score);
+      if (score > best) {
+        best = score;
+        bestVal.textContent = String(best);
+        localStorage.setItem(BEST_KEY, String(best));
+      }
+    }
+
+    function startGame() {
+      bird = { x: 180, y: H / 2, vy: -5.5, r: 14 };
+      pillars = [];
+      score = 0;
+      frameCount = 0;
+      updateHud();
+      state = 'PLAYING';
+      overlay.hidden = true;
+      beep(520, 0.06);
+    }
+
+    function flap() {
+      if (state === 'PLAYING') {
+        bird.vy = -7.2;
+        beep(520, 0.045);
+      }
+    }
+
+    function endGame() {
+      state = 'GAME_OVER';
+      beep(190, 0.2);
+      overlayTitle.textContent = 'Run Complete';
+      overlayDesc.textContent = `Score: ${score} · Best: ${best}. Ready to fly again?`;
+      startBtn.textContent = 'Play Again';
+      overlay.hidden = false;
+    }
+
+    function update() {
+      if (state !== 'PLAYING') return;
+      frameCount++;
+
+      bird.vy += 0.36;
+      bird.y += bird.vy;
+
+      if (frameCount % 95 === 0) {
+        const gap = 138;
+        const topH = 60 + Math.random() * (H - gap - 130);
+        pillars.push({ x: W + 20, w: 58, topH, gap, passed: false });
+      }
+
+      for (const p of pillars) {
+        p.x -= 3.4;
+        if (!p.passed && p.x + p.w < bird.x) {
+          p.passed = true;
+          score += 1;
+          updateHud();
+          beep(740, 0.06);
+        }
+
+        const withinX = bird.x + bird.r - 3 > p.x && bird.x - bird.r + 3 < p.x + p.w;
+        if (withinX && (bird.y - bird.r + 3 < p.topH || bird.y + bird.r - 3 > p.topH + p.gap)) {
+          endGame();
+          return;
+        }
+      }
+
+      pillars = pillars.filter((p) => p.x + p.w > -20);
+
+      if (bird.y - bird.r < 0 || bird.y + bird.r > H - 20) {
+        endGame();
+      }
+    }
+
+    function draw() {
+      const grad = ctx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, '#132038');
+      grad.addColorStop(1, '#2a2238');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+
+      // Ground strip
+      ctx.fillStyle = '#0b1120';
+      ctx.fillRect(0, H - 20, W, 20);
+
+      for (const p of pillars) {
+        ctx.fillStyle = '#065f46';
+        ctx.fillRect(p.x, 0, p.w, p.topH);
+        ctx.fillRect(p.x, p.topH + p.gap, p.w, H - 20 - (p.topH + p.gap));
+        ctx.fillStyle = '#10b981';
+        ctx.fillRect(p.x - 4, p.topH - 14, p.w + 8, 14);
+        ctx.fillRect(p.x - 4, p.topH + p.gap, p.w + 8, 14);
+      }
+
+      ctx.save();
+      ctx.translate(bird.x, bird.y);
+      ctx.rotate(Math.max(-0.4, Math.min(0.6, bird.vy * 0.06)));
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      ctx.arc(0, 0, bird.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fde68a';
+      ctx.beginPath();
+      ctx.ellipse(-4, 2, 7, 4, -0.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.arc(6, -4, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function loop() {
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+        e.preventDefault();
+        if (state === 'PLAYING') flap();
+        else startGame();
+      }
+    });
+
+    canvas.addEventListener('mousedown', flap);
+    canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      flap();
+    }, { passive: false });
+
+    startBtn.addEventListener('click', startGame);
+    muteBtn.addEventListener('click', () => {
+      muted = !muted;
+      muteBtn.textContent = muted ? 'Sound: Off' : 'Sound: On';
+    });
+
+    loop();
+  </script>
+</body>
+</html>

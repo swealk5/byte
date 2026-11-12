@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Minesweeper</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0b1120;
+      color: #f8fafc;
+      font-family: system-ui, -apple-system, sans-serif;
+      user-select: none;
+    }
+    .wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      padding: 14px;
+      gap: 12px;
+    }
+    .hud {
+      width: 100%;
+      max-width: 520px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 14px;
+      background: #162033;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .hud-stats { display: flex; gap: 16px; }
+    .hud-label { color: #94a3b8; font-weight: 500; margin-right: 4px; }
+    .hud-actions { display: flex; gap: 8px; }
+    .btn {
+      padding: 6px 12px;
+      border-radius: 7px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: #1e293b;
+      color: #f8fafc;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn.is-active { border-color: #f59e0b; color: #f59e0b; }
+    .btn-accent {
+      background: #f59e0b;
+      color: #0f172a;
+      border-color: transparent;
+    }
+    .board {
+      display: grid;
+      gap: 4px;
+      padding: 10px;
+      background: #162033;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+    }
+    .cell {
+      width: 34px;
+      height: 34px;
+      border: 0;
+      border-radius: 6px;
+      background: #334155;
+      color: #f8fafc;
+      font-size: 15px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .cell:hover:not(.revealed) { background: #475569; }
+    .cell.revealed { background: #0f172a; cursor: default; }
+    .cell.flagged { background: #7f1d1d; color: #fecaca; }
+    .cell.mine { background: #dc2626; color: #ffffff; }
+    .n1 { color: #38bdf8; }
+    .n2 { color: #34d399; }
+    .n3 { color: #fb923c; }
+    .n4 { color: #a78bfa; }
+    .n5 { color: #f87171; }
+    .status-line {
+      margin: 0;
+      font-size: 13px;
+      color: #94a3b8;
+      min-height: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hud">
+      <div class="hud-stats">
+        <div><span class="hud-label">Mines</span><span id="minesLeft">10</span></div>
+        <div><span class="hud-label">Time</span><span id="timeVal">0s</span></div>
+      </div>
+      <div class="hud-actions">
+        <button type="button" class="btn" id="modeBtn">Board: 9x9</button>
+        <button type="button" class="btn" id="flagModeBtn">Flag: Off</button>
+        <button type="button" class="btn btn-accent" id="resetBtn">Reset</button>
+      </div>
+    </div>
+
+    <div class="board" id="board"></div>
+    <p class="status-line" id="statusLine">Left-click to reveal a tile. Right-click (or toggle Flag) to mark mines.</p>
+  </div>
+
+  <script>
+    const boardEl = document.getElementById('board');
+    const minesLeftEl = document.getElementById('minesLeft');
+    const timeValEl = document.getElementById('timeVal');
+    const modeBtn = document.getElementById('modeBtn');
+    const flagModeBtn = document.getElementById('flagModeBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const statusLine = document.getElementById('statusLine');
+
+    let size = 9;
+    let mineCount = 10;
+    let grid = [];
+    let firstClick = true;
+    let gameOver = false;
+    let flagMode = false;
+    let seconds = 0;
+    let timerId = null;
+
+    function startTimer() {
+      clearInterval(timerId);
+      timerId = setInterval(() => {
+        seconds++;
+        timeValEl.textContent = `${seconds}s`;
+      }, 1000);
+    }
+
+    function init() {
+      clearInterval(timerId);
+      seconds = 0;
+      timeValEl.textContent = '0s';
+      firstClick = true;
+      gameOver = false;
+      statusLine.textContent = 'Left-click to reveal a tile. Right-click (or toggle Flag) to mark mines.';
+      grid = Array.from({ length: size }, (_, r) =>
+        Array.from({ length: size }, (_, c) => ({
+          r, c, mine: false, revealed: false, flagged: false, adj: 0
+        }))
+      );
+      boardEl.style.gridTemplateColumns = `repeat(${size}, ${size > 9 ? 28 : 36}px)`;
+      render();
+    }
+
+    function placeMines(safeR, safeC) {
+      let placed = 0;
+      while (placed < mineCount) {
+        const r = Math.floor(Math.random() * size);
+        const c = Math.floor(Math.random() * size);
+        if (grid[r][c].mine || (Math.abs(r - safeR) <= 1 && Math.abs(c - safeC) <= 1)) continue;
+        grid[r][c].mine = true;
+        placed++;
+      }
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          if (grid[r][c].mine) continue;
+          let count = 0;
+          for (let dr = -1; dr <= 1; dr++) {
+            for (let dc = -1; dc <= 1; dc++) {
+              const nr = r + dr, nc = c + dc;
+              if (nr >= 0 && nr < size && nc >= 0 && nc < size && grid[nr][nc].mine) count++;
+            }
+          }
+          grid[r][c].adj = count;
+        }
+      }
+    }
+
+    function reveal(r, c) {
+      if (gameOver) return;
+      const cell = grid[r][c];
+      if (cell.revealed || cell.flagged) return;
+
+      if (firstClick) {
+        firstClick = false;
+        placeMines(r, c);
+        startTimer();
+      }
+
+      cell.revealed = true;
+      if (cell.mine) {
+        gameOver = true;
+        clearInterval(timerId);
+        grid.flat().forEach((item) => { if (item.mine) item.revealed = true; });
+        statusLine.textContent = 'Mine triggered. Press Reset to play again.';
+        render();
+        return;
+      }
+
+      if (cell.adj === 0) {
+        for (let dr = -1; dr <= 1; dr++) {
+          for (let dc = -1; dc <= 1; dc++) {
+            const nr = r + dr, nc = c + dc;
+            if (nr >= 0 && nr < size && nc >= 0 && nc < size) reveal(nr, nc);
+          }
+        }
+      }
+
+      const unrevealedSafe = grid.flat().filter((item) => !item.mine && !item.revealed).length;
+      if (unrevealedSafe === 0) {
+        gameOver = true;
+        clearInterval(timerId);
+        statusLine.textContent = `Board cleared in ${seconds}s.`;
+      }
+      render();
+    }
+
+    function toggleFlag(r, c) {
+      if (gameOver) return;
+      const cell = grid[r][c];
+      if (cell.revealed) return;
+      cell.flagged = !cell.flagged;
+      render();
+    }
+
+    function render() {
+      const flaggedCount = grid.flat().filter((i) => i.flagged).length;
+      minesLeftEl.textContent = String(Math.max(0, mineCount - flaggedCount));
+
+      const cellPx = size > 9 ? 28 : 36;
+      boardEl.innerHTML = '';
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          const cell = grid[r][c];
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'cell';
+          btn.style.width = `${cellPx}px`;
+          btn.style.height = `${cellPx}px`;
+
+          if (cell.revealed) {
+            btn.classList.add('revealed');
+            if (cell.mine) {
+              btn.classList.add('mine');
+              btn.textContent = '*';
+            } else if (cell.adj > 0) {
+              btn.classList.add(`n${Math.min(cell.adj, 5)}`);
+              btn.textContent = String(cell.adj);
+            }
+          } else if (cell.flagged) {
+            btn.classList.add('flagged');
+            btn.textContent = 'F';
+          }
+
+          btn.addEventListener('click', () => {
+            if (flagMode) toggleFlag(r, c);
+            else reveal(r, c);
+          });
+          btn.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            toggleFlag(r, c);
+          });
+          boardEl.appendChild(btn);
+        }
+      }
+    }
+
+    modeBtn.addEventListener('click', () => {
+      if (size === 9) {
+        size = 12;
+        mineCount = 22;
+        modeBtn.textContent = 'Board: 12x12';
+      } else {
+        size = 9;
+        mineCount = 10;
+        modeBtn.textContent = 'Board: 9x9';
+      }
+      init();
+    });
+
+    flagModeBtn.addEventListener('click', () => {
+      flagMode = !flagMode;
+      flagModeBtn.classList.toggle('is-active', flagMode);
+      flagModeBtn.textContent = flagMode ? 'Flag: On' : 'Flag: Off';
+    });
+
+    resetBtn.addEventListener('click', init);
+    init();
+  </script>
+</body>
+</html>

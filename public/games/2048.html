@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>2048 Slide</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0b1120;
+      color: #f8fafc;
+      font-family: system-ui, -apple-system, sans-serif;
+      user-select: none;
+    }
+    .wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      padding: 16px;
+      gap: 14px;
+    }
+    .hud {
+      width: 100%;
+      max-width: 400px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: #162033;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .hud-stats { display: flex; gap: 18px; }
+    .hud-label { color: #94a3b8; font-weight: 500; margin-right: 4px; }
+    .btn {
+      padding: 7px 14px;
+      border-radius: 7px;
+      border: 0;
+      background: #f59e0b;
+      color: #0f172a;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn:hover { background: #fbbf24; }
+    .board-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 400px;
+      aspect-ratio: 1 / 1;
+      padding: 12px;
+      background: #162033;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: repeat(4, 1fr);
+      gap: 10px;
+      width: 100%;
+      height: 100%;
+    }
+    .tile {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 9px;
+      font-size: 26px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      background: #0f172a;
+      color: #f8fafc;
+      transition: transform 100ms ease, background-color 120ms ease;
+    }
+    .t-0 { background: #0f172a; color: transparent; }
+    .t-2 { background: #334155; color: #f8fafc; }
+    .t-4 { background: #475569; color: #f8fafc; }
+    .t-8 { background: #d97706; color: #ffffff; }
+    .t-16 { background: #ea580c; color: #ffffff; }
+    .t-32 { background: #dc2626; color: #ffffff; }
+    .t-64 { background: #b91c1c; color: #ffffff; }
+    .t-128 { background: #eab308; color: #0f172a; font-size: 22px; }
+    .t-256 { background: #f59e0b; color: #0f172a; font-size: 22px; }
+    .t-512 { background: #10b981; color: #0f172a; font-size: 22px; }
+    .t-1024 { background: #06b6d4; color: #0f172a; font-size: 19px; }
+    .t-2048 { background: #fbbf24; color: #0f172a; font-size: 19px; }
+    .hint { color: #94a3b8; font-size: 13px; margin: 0; }
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      background: rgba(11, 17, 32, 0.86);
+      border-radius: 14px;
+      text-align: center;
+      padding: 20px;
+    }
+    .overlay[hidden] { display: none; }
+    .overlay h2 { margin: 0; font-size: 24px; }
+    .overlay p { margin: 0; color: #94a3b8; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hud">
+      <div class="hud-stats">
+        <div><span class="hud-label">Score</span><span id="scoreVal">0</span></div>
+        <div><span class="hud-label">Best</span><span id="bestVal">0</span></div>
+      </div>
+      <button type="button" class="btn" id="newBtn">New Game</button>
+    </div>
+
+    <div class="board-wrap" id="boardWrap">
+      <div class="grid" id="grid"></div>
+      <div class="overlay" id="overlay" hidden>
+        <h2 id="endTitle">No Moves Left</h2>
+        <p id="endDesc">Final score: 0</p>
+        <button type="button" class="btn" id="retryBtn">Play Again</button>
+      </div>
+    </div>
+
+    <p class="hint">Use Arrow keys, WASD, or swipe to merge tiles.</p>
+  </div>
+
+  <script>
+    const gridEl = document.getElementById('grid');
+    const scoreVal = document.getElementById('scoreVal');
+    const bestVal = document.getElementById('bestVal');
+    const overlay = document.getElementById('overlay');
+    const endTitle = document.getElementById('endTitle');
+    const endDesc = document.getElementById('endDesc');
+    const newBtn = document.getElementById('newBtn');
+    const retryBtn = document.getElementById('retryBtn');
+    const boardWrap = document.getElementById('boardWrap');
+
+    const BEST_KEY = 'playdeck_2048_best';
+    let best = Number(localStorage.getItem(BEST_KEY) || 0);
+    bestVal.textContent = String(best);
+
+    let board = [];
+    let score = 0;
+    let wonOnce = false;
+
+    function init() {
+      board = Array.from({ length: 4 }, () => [0, 0, 0, 0]);
+      score = 0;
+      wonOnce = false;
+      overlay.hidden = true;
+      addRandomTile();
+      addRandomTile();
+      render();
+    }
+
+    function addRandomTile() {
+      const empty = [];
+      for (let r = 0; r < 4; r++) {
+        for (let c = 0; c < 4; c++) {
+          if (board[r][c] === 0) empty.push([r, c]);
+        }
+      }
+      if (!empty.length) return;
+      const [r, c] = empty[Math.floor(Math.random() * empty.length)];
+      board[r][c] = Math.random() < 0.9 ? 2 : 4;
+    }
+
+    function slideRowLeft(row) {
+      const filtered = row.filter((v) => v !== 0);
+      const out = [];
+      let gained = 0;
+      for (let i = 0; i < filtered.length; i++) {
+        if (filtered[i] === filtered[i + 1]) {
+          const merged = filtered[i] * 2;
+          out.push(merged);
+          gained += merged;
+          i++;
+        } else {
+          out.push(filtered[i]);
+        }
+      }
+      while (out.length < 4) out.push(0);
+      return { out, gained };
+    }
+
+    function rotateClockwise(mat) {
+      return mat[0].map((_, c) => mat.map((row) => row[c]).reverse());
+    }
+
+    function move(dir) {
+      let working = board.map((r) => [...r]);
+      const rotations = { left: 0, down: 1, right: 2, up: 3 }[dir];
+      for (let i = 0; i < rotations; i++) working = rotateClockwise(working);
+
+      let moved = false;
+      let gainedTotal = 0;
+      working = working.map((row) => {
+        const { out, gained } = slideRowLeft(row);
+        if (out.some((v, idx) => v !== row[idx])) moved = true;
+        gainedTotal += gained;
+        return out;
+      });
+
+      for (let i = 0; i < (4 - rotations) % 4; i++) working = rotateClockwise(working);
+
+      if (!moved) return;
+      board = working;
+      score += gainedTotal;
+      addRandomTile();
+      render();
+
+      if (!wonOnce && board.some((r) => r.includes(2048))) {
+        wonOnce = true;
+        endTitle.textContent = 'You Reached 2048';
+        endDesc.textContent = `Score: ${score}. Keep going or start fresh!`;
+        retryBtn.textContent = 'Keep Playing';
+        retryBtn.onclick = () => { overlay.hidden = true; };
+        overlay.hidden = false;
+      } else if (!hasMoves()) {
+        endTitle.textContent = 'No Moves Left';
+        endDesc.textContent = `Final score: ${score}`;
+        retryBtn.textContent = 'Play Again';
+        retryBtn.onclick = init;
+        overlay.hidden = false;
+      }
+    }
+
+    function hasMoves() {
+      for (let r = 0; r < 4; r++) {
+        for (let c = 0; c < 4; c++) {
+          if (board[r][c] === 0) return true;
+          if (r < 3 && board[r][c] === board[r + 1][c]) return true;
+          if (c < 3 && board[r][c] === board[r][c + 1]) return true;
+        }
+      }
+      return false;
+    }
+
+    function render() {
+      scoreVal.textContent = String(score);
+      if (score > best) {
+        best = score;
+        bestVal.textContent = String(best);
+        localStorage.setItem(BEST_KEY, String(best));
+      }
+      gridEl.innerHTML = '';
+      for (let r = 0; r < 4; r++) {
+        for (let c = 0; c < 4; c++) {
+          const val = board[r][c];
+          const div = document.createElement('div');
+          div.className = `tile t-${Math.min(val, 2048)}`;
+          div.textContent = val === 0 ? '' : String(val);
+          gridEl.appendChild(div);
+        }
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      const map = {
+        ArrowLeft: 'left', a: 'left', A: 'left',
+        ArrowRight: 'right', d: 'right', D: 'right',
+        ArrowUp: 'up', w: 'up', W: 'up',
+        ArrowDown: 'down', s: 'down', S: 'down',
+      };
+      if (map[e.key]) {
+        e.preventDefault();
+        move(map[e.key]);
+      }
+    });
+
+    let touchStart = null;
+    boardWrap.addEventListener('touchstart', (e) => {
+      if (e.touches[0]) touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }, { passive: true });
+    boardWrap.addEventListener('touchend', (e) => {
+      if (!touchStart || !e.changedTouches[0]) return;
+      const dx = e.changedTouches[0].clientX - touchStart.x;
+      const dy = e.changedTouches[0].clientY - touchStart.y;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) > 20) {
+        if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 'right' : 'left');
+        else move(dy > 0 ? 'down' : 'up');
+      }
+      touchStart = null;
+    }, { passive: true });
+
+    newBtn.addEventListener('click', init);
+    retryBtn.addEventListener('click', init);
+    init();
+  </script>
+</body>
+</html>
